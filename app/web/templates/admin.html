@@ -1,0 +1,476 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin</title>
+
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+    <style>
+      :root{
+        --bg:#0b1220; --card:#101a33; --card2:#0f1830; --border:#223056; --muted:#9fb2da;
+        --accent:#2f6fed; --danger:#e14b4b; --ok:#2f7a3e;
+      }
+      body { font-family: system-ui, Arial; margin: 0; padding: 16px; background:var(--bg); color:#e7eefc; }
+      header { display:flex; align-items:center; justify-content:space-between; gap:12px; max-width: 1180px; margin: 0 auto; }
+      .wrap { max-width: 1180px; margin: 14px auto; }
+      .grid { display:grid; grid-template-columns: 1fr; gap: 14px; }
+      .kpis { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+      @media (max-width: 980px){ .kpis { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 520px){ .kpis { grid-template-columns: 1fr; } }
+      .card { background:var(--card); border:1px solid var(--border); border-radius: 14px; padding: 14px; }
+      .card h3 { margin: 0 0 10px 0; }
+      .kpi { background:var(--card2); border:1px solid var(--border); border-radius: 14px; padding: 12px; }
+      .kpi .n { font-size: 26px; font-weight: 800; margin-top: 4px; }
+      .kpi .l { font-size: 12px; color: var(--muted); }
+      .small { font-size: 12px; color: var(--muted); }
+      .tabs { display:flex; gap:10px; flex-wrap:wrap; }
+      .tab { width:auto; padding:10px 12px; border-radius: 999px; border:1px solid var(--border); background:#0b1220; color:#e7eefc; cursor:pointer; font-weight:700; }
+      .tab.active { background:#24304f; border-color:#2a3a68; }
+      input, select, textarea, button { width:100%; padding: 12px; border-radius: 10px; border:1px solid #2a3a68; background:#0b1220; color:#e7eefc; }
+      button { background:var(--accent); border:none; cursor:pointer; font-weight:700; }
+      button.secondary { background:#24304f; }
+      button.danger { background: #3a1b1b; border: 1px solid #7a2f2f; }
+      button.mini { width:auto; padding:8px 10px; border-radius: 10px; font-weight:700; }
+      .row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      @media (max-width: 860px){ .row { grid-template-columns: 1fr; } }
+      table { width:100%; border-collapse: collapse; }
+      th, td { text-align:left; padding: 10px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: top; }
+      th { font-size: 12px; color: var(--muted); font-weight: 700; }
+      .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; border:1px solid var(--border); background:#0b1220; font-size: 12px; }
+      .pill.ok { border-color:#2f7a3e; background:#12351b; }
+      .pill.bad { border-color:#7a2f2f; background:#3a1b1b; }
+      .actions { display:flex; gap:8px; flex-wrap:wrap; }
+      .msg { margin-top:10px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: #0b1220; }
+      .msg.ok { border-color: #2f7a3e; background:#12351b; }
+      .msg.err { border-color: #7a2f2f; background:#3a1b1b; }
+      .hide { display:none; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div>
+        <div style="font-size:18px;font-weight:800;">Admin Operations</div>
+        <div class="small">Signed in as {{ user.role.value }} • {{ user.phone }}</div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="overview" type="button">Overview</button>
+          <button class="tab" data-tab="users" type="button">Users</button>
+          <button class="tab" data-tab="jobs" type="button">Jobs</button>
+        </div>
+        <form method="post" action="/web/logout">
+          <button type="submit" class="secondary" style="width:auto; padding:10px 14px;">Logout</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <!-- OVERVIEW -->
+      <section id="tab_overview" class="grid">
+        <div class="kpis">
+          <div class="kpi">
+            <div class="l">Total jobs (last 100)</div>
+            <div class="n">{{ jobs|length }}</div>
+          </div>
+          <div class="kpi">
+            <div class="l">Open (not closed/cancelled)</div>
+            <div class="n" id="kpiOpen">—</div>
+          </div>
+          <div class="kpi">
+            <div class="l">Awaiting assignment</div>
+            <div class="n" id="kpiUnassigned">—</div>
+          </div>
+          <div class="kpi">
+            <div class="l">Completed (closed)</div>
+            <div class="n" id="kpiClosed">—</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Recent jobs snapshot</h3>
+          <div class="small" style="margin-bottom:10px;">This page shows the latest 100 jobs loaded on the server render. Use the Jobs tab for quick filters.</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Plate</th>
+                <th>Status</th>
+                <th>Officer</th>
+                <th>Driver</th>
+                <th>GPS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for j in jobs[:10] %}
+                <tr>
+                  <td class="small">{{ j.created_at }}</td>
+                  <td style="font-weight:800;">{{ j.plate_number }}</td>
+                  <td class="small"><span class="pill">{{ j.status.value }}</span></td>
+                  <td class="small mono">{{ j.officer_id }}</td>
+                  <td class="small mono">{{ j.assigned_driver_id }}</td>
+                  <td class="small">{{ j.location_lat }}, {{ j.location_lng }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- USERS -->
+      <section id="tab_users" class="grid hide">
+        <div class="card">
+          <h3>User management</h3>
+          <div class="row">
+            <div>
+              <label class="small">Search (name or phone)</label>
+              <input id="userSearch" placeholder="e.g. Ahmed or +2526..." autocomplete="off" />
+            </div>
+            <div>
+              <label class="small">Role filter</label>
+              <select id="roleFilter">
+                <option value="">All roles</option>
+                <option value="OFFICER">OFFICER</option>
+                <option value="DISPATCHER">DISPATCHER</option>
+                <option value="DRIVER">DRIVER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="height:10px;"></div>
+          <div class="row">
+            <div>
+              <label class="small">Create user: name</label>
+              <input id="newName" placeholder="Full name" />
+            </div>
+            <div>
+              <label class="small">Phone</label>
+              <input id="newPhone" placeholder="+252..." />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <label class="small">Role</label>
+              <select id="newRole">
+                <option>OFFICER</option>
+                <option>DISPATCHER</option>
+                <option>DRIVER</option>
+                <option>ADMIN</option>
+              </select>
+            </div>
+            <div>
+              <label class="small">Temporary password</label>
+              <input id="newPass" type="password" placeholder="Min 8 chars" />
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <button type="button" id="btnCreateUser" style="width:auto;">Create user</button>
+            <button type="button" class="secondary" id="btnRefreshUsers" style="width:auto;">Refresh list</button>
+          </div>
+          <div id="userMsg"></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:end; gap:12px; flex-wrap:wrap;">
+            <div>
+              <h3 style="margin-bottom:6px;">Users</h3>
+              <div class="small" id="userCount">Loading…</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="userTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- JOBS -->
+      <section id="tab_jobs" class="grid hide">
+        <div class="card">
+          <h3>Jobs (last 100)</h3>
+          <div class="row">
+            <div>
+              <label class="small">Quick filter</label>
+              <select id="jobFilter">
+                <option value="ALL">All</option>
+                <option value="OPEN">Open</option>
+                <option value="UNASSIGNED">Unassigned</option>
+                <option value="CLOSED">Closed</option>
+              </select>
+            </div>
+            <div>
+              <label class="small">Search plate</label>
+              <input id="plateSearch" placeholder="ABC123" />
+            </div>
+          </div>
+
+          <div style="height:10px;"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Plate</th>
+                <th>Status</th>
+                <th>Officer</th>
+                <th>Driver</th>
+                <th>GPS</th>
+              </tr>
+            </thead>
+            <tbody id="jobsTable">
+              {% for j in jobs %}
+                <tr
+                  data-status="{{ j.status.value }}"
+                  data-driver="{{ j.assigned_driver_id or '' }}"
+                  data-plate="{{ j.plate_number }}"
+                >
+                  <td class="small">{{ j.created_at }}</td>
+                  <td style="font-weight:800;">{{ j.plate_number }}</td>
+                  <td class="small"><span class="pill">{{ j.status.value }}</span></td>
+                  <td class="small mono">{{ j.officer_id }}</td>
+                  <td class="small mono">{{ j.assigned_driver_id }}</td>
+                  <td class="small">{{ j.location_lat }}, {{ j.location_lng }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\\[\\]\\\\\/\+^]/g, '\\$&') + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : null;
+      }
+
+      function showMsg(el, kind, text) {
+        el.innerHTML = `<div class="msg ${kind}">${text}</div>`;
+        setTimeout(() => { if (el.innerHTML.includes(text)) el.innerHTML = ""; }, 7000);
+      }
+
+      function fmtDate(v) {
+        if (!v) return "";
+        return String(v).replace('T',' ').replace('Z','');
+      }
+
+      function pillForActive(isActive){
+        return isActive ? `<span class="pill ok">Active</span>` : `<span class="pill bad">Inactive</span>`;
+      }
+
+      // Tabs
+      const tabs = Array.from(document.querySelectorAll('.tab'));
+      const panes = {
+        overview: document.getElementById('tab_overview'),
+        users: document.getElementById('tab_users'),
+        jobs: document.getElementById('tab_jobs'),
+      };
+      tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabs.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const t = btn.dataset.tab;
+          Object.values(panes).forEach(p => p.classList.add('hide'));
+          panes[t].classList.remove('hide');
+          if (t === 'users') loadUsers();
+        });
+      });
+
+      // KPI calculation from server-rendered jobs
+      (function computeKPIs(){
+        const rows = Array.from(document.querySelectorAll('#jobsTable tr'));
+        let open = 0, unassigned = 0, closed = 0;
+        for (const r of rows){
+          const st = (r.dataset.status || '').toUpperCase();
+          const drv = (r.dataset.driver || '').trim();
+          const isClosed = (st === 'CLOSED' || st === 'CANCELLED');
+          if (isClosed) closed += 1; else open += 1;
+          if (!isClosed && !drv) unassigned += 1;
+        }
+        document.getElementById('kpiOpen').textContent = String(open);
+        document.getElementById('kpiUnassigned').textContent = String(unassigned);
+        document.getElementById('kpiClosed').textContent = String(closed);
+      })();
+
+      // Jobs quick filter
+      const jobFilter = document.getElementById('jobFilter');
+      const plateSearch = document.getElementById('plateSearch');
+      function applyJobFilter(){
+        const mode = jobFilter.value;
+        const plateQ = (plateSearch.value || '').trim().toUpperCase();
+        const rows = Array.from(document.querySelectorAll('#jobsTable tr'));
+        for (const r of rows){
+          const st = (r.dataset.status || '').toUpperCase();
+          const drv = (r.dataset.driver || '').trim();
+          const plate = (r.dataset.plate || '').toUpperCase();
+          const isClosed = (st === 'CLOSED' || st === 'CANCELLED');
+          let ok = true;
+          if (mode === 'OPEN') ok = ok && !isClosed;
+          if (mode === 'UNASSIGNED') ok = ok && !isClosed && !drv;
+          if (mode === 'CLOSED') ok = ok && isClosed;
+          if (plateQ) ok = ok && plate.includes(plateQ);
+          r.style.display = ok ? '' : 'none';
+        }
+      }
+      jobFilter.addEventListener('change', applyJobFilter);
+      plateSearch.addEventListener('input', applyJobFilter);
+
+      // User management
+      const userTable = document.getElementById('userTable');
+      const userCount = document.getElementById('userCount');
+      const userMsg = document.getElementById('userMsg');
+      const userSearch = document.getElementById('userSearch');
+      const roleFilter = document.getElementById('roleFilter');
+      const btnRefreshUsers = document.getElementById('btnRefreshUsers');
+      const btnCreateUser = document.getElementById('btnCreateUser');
+
+      async function api(url, opts={}){
+        const token = getCookie('access_token');
+        if (!token) throw new Error('Missing session token. Please log in again.');
+        const headers = Object.assign({}, opts.headers || {}, { 'Authorization': `Bearer ${token}` });
+        const res = await fetch(url, Object.assign({}, opts, { headers }));
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : await res.text();
+        if (!res.ok){
+          const detail = (data && data.detail) ? data.detail : (typeof data === 'string' ? data : 'Request failed');
+          throw new Error(detail);
+        }
+        return data;
+      }
+
+      let _usersCache = [];
+      function renderUsers(users){
+        userTable.innerHTML = '';
+        for (const u of users){
+          const tr = document.createElement('tr');
+          const role = u.role || '';
+          const isActive = !!u.is_active;
+
+          tr.innerHTML = `
+            <td style="font-weight:800;">${u.name || ''}</td>
+            <td class="mono">${u.phone || ''}</td>
+            <td><span class="pill">${role}</span></td>
+            <td>${pillForActive(isActive)}</td>
+            <td class="small">${fmtDate(u.created_at)}</td>
+            <td>
+              <div class="actions">
+                <button class="mini secondary" data-act="toggle" data-id="${u.id}">${isActive ? 'Deactivate' : 'Activate'}</button>
+                <button class="mini secondary" data-act="reset" data-id="${u.id}">Reset password</button>
+                <button class="mini danger" data-act="remove" data-id="${u.id}">Remove</button>
+              </div>
+              <div class="small" style="margin-top:6px;">ID: <span class="mono">${u.id}</span></div>
+            </td>
+          `;
+          userTable.appendChild(tr);
+        }
+
+        userTable.querySelectorAll('button[data-act]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const act = btn.dataset.act;
+            const id = btn.dataset.id;
+            try {
+              if (act === 'toggle'){
+                const u = _usersCache.find(x => x.id === id);
+                const next = !(u && u.is_active);
+                await api(`/admin/users/${id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ is_active: next })
+                });
+                showMsg(userMsg, 'ok', `User ${next ? 'activated' : 'deactivated'}.`);
+                await loadUsers(true);
+              }
+
+              if (act === 'reset'){
+                const pw = prompt('Enter a new temporary password (min 8 chars):');
+                if (!pw) return;
+                if (pw.length < 8) return showMsg(userMsg, 'err', 'Password must be at least 8 characters.');
+                await api(`/admin/users/${id}/reset-password`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ new_password: pw })
+                });
+                showMsg(userMsg, 'ok', 'Password reset successfully.');
+              }
+
+              if (act === 'remove'){
+                const ok = confirm('Remove user?\n\nOK = Safe remove (deactivate).\nCancel = Keep.');
+                if (!ok) return;
+                await api(`/admin/users/${id}`, { method: 'DELETE' });
+                showMsg(userMsg, 'ok', 'User removed (deactivated).');
+                await loadUsers(true);
+              }
+            } catch (e){
+              showMsg(userMsg, 'err', e.message);
+            }
+          });
+        });
+      }
+
+      function applyUserFilter(){
+        const q = (userSearch.value || '').trim().toLowerCase();
+        const role = roleFilter.value;
+        let filtered = _usersCache;
+        if (role) filtered = filtered.filter(u => (u.role || '') === role);
+        if (q) filtered = filtered.filter(u => (u.name || '').toLowerCase().includes(q) || (u.phone || '').toLowerCase().includes(q));
+        renderUsers(filtered);
+        userCount.textContent = `${filtered.length} shown / ${_usersCache.length} total`;
+      }
+
+      async function loadUsers(force=false){
+        try {
+          userCount.textContent = 'Loading…';
+          const users = await api('/admin/users');
+          _usersCache = Array.isArray(users) ? users : [];
+          applyUserFilter();
+        } catch (e){
+          userCount.textContent = 'Failed to load users';
+          showMsg(userMsg, 'err', e.message);
+        }
+      }
+
+      userSearch.addEventListener('input', applyUserFilter);
+      roleFilter.addEventListener('change', () => { loadUsers(true); });
+      btnRefreshUsers.addEventListener('click', () => loadUsers(true));
+
+      btnCreateUser.addEventListener('click', async () => {
+        const name = document.getElementById('newName').value.trim();
+        const phone = document.getElementById('newPhone').value.trim();
+        const role = document.getElementById('newRole').value;
+        const password = document.getElementById('newPass').value;
+        if (!name) return showMsg(userMsg, 'err', 'Name is required.');
+        if (!phone) return showMsg(userMsg, 'err', 'Phone is required.');
+        if (!password || password.length < 8) return showMsg(userMsg, 'err', 'Password must be at least 8 characters.');
+
+        try {
+          await api('/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, phone, role, password, is_active: true })
+          });
+          showMsg(userMsg, 'ok', 'User created successfully.');
+          document.getElementById('newName').value = '';
+          document.getElementById('newPhone').value = '';
+          document.getElementById('newPass').value = '';
+          await loadUsers(true);
+        } catch (e){
+          showMsg(userMsg, 'err', e.message);
+        }
+      });
+    </script>
+  </body>
+</html>

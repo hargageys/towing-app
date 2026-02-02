@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Traffic System • Login</title>
+    <style>
+      :root{
+        --bg0:#070b16;
+        --bg1:#0b1220;
+        --card:#0f1a33;
+        --card2:#0b1328;
+        --stroke:#223056;
+        --stroke2:#2a3a68;
+        --text:#e7eefc;
+        --muted: rgba(231,238,252,0.70);
+        --muted2: rgba(231,238,252,0.55);
+        --accent:#2f6fed;
+        --accent2:#3a86ff;
+        --danger-bg:#3a1b1b;
+        --danger-stroke:#7a2f2f;
+        --shadow: 0 18px 55px rgba(0,0,0,0.55);
+        --radius: 18px;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        color: var(--text);
+        background:
+          radial-gradient(900px 500px at 20% 0%, rgba(47,111,237,0.25), transparent 55%),
+          radial-gradient(700px 450px at 90% 15%, rgba(58,134,255,0.18), transparent 50%),
+          linear-gradient(180deg, var(--bg0), var(--bg1));
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .wrap { width: 100%; max-width: 440px; }
+
+      .brand {
+        display:flex; align-items:center; gap:12px;
+        margin: 0 auto 14px;
+        justify-content: center;
+      }
+      .logo {
+        width: 42px; height: 42px;
+        border-radius: 14px;
+        background:
+          linear-gradient(135deg, rgba(47,111,237,1), rgba(58,134,255,0.85));
+        box-shadow: 0 14px 30px rgba(47,111,237,0.25);
+        border: 1px solid rgba(255,255,255,0.12);
+      }
+      .brand h1 {
+        font-size: 16px;
+        letter-spacing: 0.2px;
+        margin: 0;
+        font-weight: 750;
+      }
+      .brand p {
+        margin: 2px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .card {
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.04), transparent 20%),
+          linear-gradient(180deg, var(--card), var(--card2));
+        border: 1px solid rgba(34,48,86,0.95);
+        border-radius: var(--radius);
+        padding: 18px;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+      }
+      .card:before {
+        content:"";
+        position:absolute; inset:-1px;
+        background: radial-gradient(650px 220px at 30% 0%, rgba(47,111,237,0.15), transparent 55%);
+        pointer-events:none;
+      }
+
+      .title {
+        position: relative;
+        margin: 2px 0 2px;
+        font-size: 18px;
+        font-weight: 800;
+      }
+      .subtitle {
+        position: relative;
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .err {
+        position: relative;
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-stroke);
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin: 0 0 12px;
+        font-size: 13px;
+      }
+
+      .field {
+        position: relative;
+        margin: 10px 0 12px;
+      }
+      label {
+        display:block;
+        margin: 0 0 6px;
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.2px;
+      }
+
+      .input {
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(42,58,104,0.9);
+        background: rgba(11,18,32,0.75);
+        color: var(--text);
+        outline: none;
+        transition: border-color .15s ease, box-shadow .15s ease, transform .05s ease;
+      }
+      .input::placeholder { color: rgba(231,238,252,0.40); }
+      .input:focus {
+        border-color: rgba(58,134,255,0.9);
+        box-shadow: 0 0 0 4px rgba(58,134,255,0.18);
+      }
+
+      .btn {
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: white;
+        font-weight: 800;
+        letter-spacing: 0.2px;
+        cursor: pointer;
+        box-shadow: 0 14px 28px rgba(47,111,237,0.25);
+        transition: transform .05s ease, filter .15s ease;
+      }
+      .btn:active { transform: translateY(1px); }
+      .btn:hover { filter: brightness(1.05); }
+
+      .footer {
+        margin-top: 12px;
+        font-size: 12px;
+        color: var(--muted2);
+        line-height: 1.35;
+        position: relative;
+      }
+
+      .chip {
+        display:inline-block;
+        border: 1px solid rgba(34,48,86,0.9);
+        background: rgba(11,18,32,0.65);
+        border-radius: 999px;
+        padding: 6px 10px;
+        margin-top: 10px;
+      }
+      .chip b { color: rgba(231,238,252,0.9); }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Traffic Management System</h1>
+          <p>Secure role-based access</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Sign in</div>
+        <div class="subtitle">Use your phone number and password to access your dashboard.</div>
+
+        {% if error %}
+          <div class="err">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/web/login" autocomplete="on">
+          <div class="field">
+            <label for="phone">Phone</label>
+            <input id="phone" class="input" name="phone" placeholder="+252634000001" inputmode="tel" required />
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" class="input" name="password" type="password" placeholder="••••••••" required />
+          </div>
+
+          <button class="btn" type="submit">Continue</button>
+        </form>
+
+        <div class="footer">
+          <div class="chip">
+            Seed users exist (example): <b>officer</b> +252634000001 / officer123
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

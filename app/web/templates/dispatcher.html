@@ -1,0 +1,237 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dispatcher</title>
+    <style>
+      :root{
+        --bg:#0b1220; --card:#101a33; --stroke:#223056; --stroke2:#2a3a68;
+        --text:#e7eefc; --muted: rgba(231,238,252,0.70);
+        --accent:#2f6fed; --okbg:#12351b; --okst:#2f7a3e; --errbg:#3a1b1b; --errst:#7a2f2f;
+        --r:14px;
+      }
+      * { box-sizing:border-box; }
+      body { font-family: system-ui, Arial; margin:0; padding:16px; background:var(--bg); color:var(--text); }
+      header { max-width: 1200px; margin: 0 auto 12px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+      .small { font-size: 12px; color: var(--muted); }
+
+      .grid { max-width: 1200px; margin: 0 auto; display:grid; grid-template-columns: 1.25fr 0.75fr; gap: 12px; }
+      @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+      .card { background:var(--card); border:1px solid var(--stroke); border-radius: var(--r); padding: 12px; }
+      .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+      button { padding:10px 12px; border-radius: 12px; border:1px solid rgba(0,0,0,0); background: var(--accent); color:white; cursor:pointer; font-weight:800; }
+      .btn-ghost { background:#24304f; border:1px solid var(--stroke); font-weight:700; }
+      select { width: 100%; padding:10px 12px; border-radius: 12px; border:1px solid var(--stroke2); background:#0b1220; color:var(--text); }
+
+      .msg .ok { background: var(--okbg); border:1px solid var(--okst); padding:10px; border-radius:12px; margin-top:12px; }
+      .msg .err { background: var(--errbg); border:1px solid var(--errst); padding:10px; border-radius:12px; margin-top:12px; }
+
+      table { width:100%; border-collapse: collapse; }
+      th, td { text-align:left; padding: 10px; border-bottom: 1px solid var(--stroke); font-size: 14px; vertical-align: top; }
+      th { color: var(--muted); font-weight:700; }
+      tr[data-job-row="1"]:hover td { background: rgba(255,255,255,0.02); cursor:pointer; }
+
+      .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; border:1px solid var(--stroke); background: rgba(11,18,32,0.7); font-size:12px; color: var(--muted); }
+      .actions { display:grid; grid-template-columns: 1fr auto; gap: 8px; align-items:center; }
+      a { color: #7fb0ff; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      iframe { width: 100%; height: 420px; border:1px solid var(--stroke); border-radius: 14px; background:#0b1220; }
+      .mapmeta { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-top:10px; }
+
+      .selected td { background: rgba(47,111,237,0.09) !important; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div>
+        <div style="font-size:18px;font-weight:800;">Dispatcher Dashboard</div>
+        <div class="small">Signed in as {{ user.role.value }} • {{ user.phone }}</div>
+      </div>
+      <form method="post" action="/web/logout">
+        <button type="submit" class="btn-ghost">Logout</button>
+      </form>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <div class="topbar">
+          <div style="font-weight:800;">Jobs</div>
+          <div class="pill">Click a job → map updates</div>
+        </div>
+
+        <div id="msg" class="msg"></div>
+
+        <table id="jobsTable">
+          <thead>
+            <tr>
+              <th>Created</th>
+              <th>Plate</th>
+              <th>Status</th>
+              <th>GPS</th>
+              <th>Assigned</th>
+              <th style="width:260px;">Assign Driver</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for j in jobs %}
+              <tr
+                data-job-row="1"
+                data-job-id="{{ j.id }}"
+                data-plate="{{ j.plate_number }}"
+                data-status="{{ j.status.value }}"
+                data-lat="{{ j.location_lat }}"
+                data-lng="{{ j.location_lng }}"
+              >
+                <td>{{ j.created_at }}</td>
+                <td style="font-weight:900;">{{ j.plate_number }}</td>
+                <td>{{ j.status.value }}</td>
+                <td class="small">{{ j.location_lat }}, {{ j.location_lng }}</td>
+                <td class="small">{{ j.assigned_driver_id or "—" }}</td>
+                <td data-stop-row-click="1">
+                  <div class="actions">
+                    <select id="driver-{{ j.id }}">
+                      <option value="">Select driver…</option>
+                      {% for d in drivers %}
+                        <option value="{{ d.id }}">{{ d.name }} ({{ d.phone }})</option>
+                      {% endfor %}
+                    </select>
+                    <button type="button" data-assign-btn="1" data-job-id="{{ j.id }}">Assign</button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <div style="font-weight:900;">Google Maps</div>
+          <a id="openMaps" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
+        </div>
+
+        <div class="small" id="selectedText" style="margin-top:6px;">Select a job to view its coordinates.</div>
+
+        <iframe
+          id="mapFrame"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          src="about:blank">
+        </iframe>
+
+        <div class="mapmeta">
+          <div class="small" id="coordText">—</div>
+          <div class="pill" id="jobPill">No job selected</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const msg = document.getElementById("msg");
+      const jobsTable = document.getElementById("jobsTable");
+
+      function showMessage(kind, text) {
+        msg.innerHTML = `<div class="${kind}">${text}</div>`;
+      }
+
+      function getCookie(name) {
+        const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+        return m ? decodeURIComponent(m[2]) : null;
+      }
+
+      function mapsEmbedUrl(lat, lng) {
+        return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&z=18&output=embed`;
+      }
+      function mapsOpenUrl(lat, lng) {
+        return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&z=18`;
+      }
+
+      function selectJobFromRow(row) {
+        // Clear previous selection
+        document.querySelectorAll("tr.selected").forEach(r => r.classList.remove("selected"));
+        row.classList.add("selected");
+
+        const jobId = row.dataset.jobId;
+        const plate = row.dataset.plate || "—";
+        const status = row.dataset.status || "—";
+        const lat = Number(row.dataset.lat);
+        const lng = Number(row.dataset.lng);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          showMessage("err", "This job has invalid coordinates.");
+          return;
+        }
+
+        document.getElementById("mapFrame").src = mapsEmbedUrl(lat, lng);
+        document.getElementById("openMaps").href = mapsOpenUrl(lat, lng);
+        document.getElementById("selectedText").textContent = `${plate} • ${status} • Job ID: ${jobId}`;
+        document.getElementById("coordText").textContent = `lat=${lat.toFixed(6)}, lng=${lng.toFixed(6)}`;
+        document.getElementById("jobPill").textContent = plate;
+      }
+
+      async function assignDriver(jobId) {
+        const token = getCookie("access_token");
+        if (!token) return showMessage("err", "Not authenticated. Please log in again.");
+
+        const sel = document.getElementById(`driver-${jobId}`);
+        const driverId = sel ? sel.value : "";
+        if (!driverId) return showMessage("err", "Select a driver first.");
+
+        try {
+          const res = await fetch(`/tow-jobs/${jobId}/assign`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ driver_id: driverId })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            showMessage("err", data?.detail || "Assign failed");
+            return;
+          }
+
+          showMessage("ok", `Assigned: ${data.plate_number} → driver ${data.assigned_driver_id}. Refreshing…`);
+          setTimeout(() => window.location.reload(), 650);
+        } catch (e) {
+          showMessage("err", "Network error: " + e.message);
+        }
+      }
+
+      // Event delegation: row click + assign button click
+      jobsTable.addEventListener("click", (ev) => {
+        const target = ev.target;
+
+        // Assign button
+        const btn = target.closest && target.closest("button[data-assign-btn='1']");
+        if (btn) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          assignDriver(btn.dataset.jobId);
+          return;
+        }
+
+        // Click inside assign cell should not trigger row selection
+        if (target.closest && target.closest("[data-stop-row-click='1']")) {
+          return;
+        }
+
+        // Row selection
+        const row = target.closest && target.closest("tr[data-job-row='1']");
+        if (row) selectJobFromRow(row);
+      });
+
+      // Auto-select first job if exists
+      (function autoSelectFirst(){
+        const firstRow = document.querySelector("tr[data-job-row='1']");
+        if (firstRow) selectJobFromRow(firstRow);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Driver</title>
+    <style>
+      :root{
+        --bg:#0b1220; --card:#101a33; --stroke:#223056; --stroke2:#2a3a68;
+        --text:#e7eefc; --muted: rgba(231,238,252,0.70);
+        --r:14px;
+      }
+      * { box-sizing:border-box; }
+      body { font-family: system-ui, Arial; margin:0; padding:16px; background:var(--bg); color:var(--text); }
+      header { max-width: 1200px; margin: 0 auto 12px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+      .small { font-size: 12px; color: var(--muted); }
+
+      .grid { max-width: 1200px; margin: 0 auto; display:grid; grid-template-columns: 0.95fr 1.05fr; gap: 12px; }
+      @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+      .card { background:var(--card); border:1px solid var(--stroke); border-radius: var(--r); padding: 12px; }
+      button { padding:10px 12px; border-radius: 12px; border:1px solid var(--stroke); background:#24304f; color:var(--text); cursor:pointer; font-weight:800; }
+      a { color: #7fb0ff; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      .job {
+        border: 1px solid var(--stroke);
+        border-radius: 14px;
+        padding: 12px;
+        margin-bottom: 10px;
+        background: rgba(11,18,32,0.35);
+        cursor: pointer;
+      }
+      .job:hover { background: rgba(255,255,255,0.03); }
+      .job.selected { background: rgba(47,111,237,0.09); }
+      .plate { font-weight: 950; font-size: 16px; }
+      .meta { margin-top:4px; }
+
+      iframe { width: 100%; height: 480px; border:1px solid var(--stroke); border-radius: 14px; background:#0b1220; }
+      .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; border:1px solid var(--stroke); background: rgba(11,18,32,0.7); font-size:12px; color: var(--muted); }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div>
+        <div style="font-size:18px;font-weight:900;">Driver Dashboard</div>
+        <div class="small">Signed in as {{ user.role.value }} • {{ user.phone }}</div>
+      </div>
+      <form method="post" action="/web/logout">
+        <button type="submit">Logout</button>
+      </form>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <div style="font-weight:900;">Assigned Jobs</div>
+          <span class="pill">Tap a job → map updates</span>
+        </div>
+
+        {% if jobs|length == 0 %}
+          <div class="small" style="margin-top:10px;">No assigned jobs yet. Ask dispatcher to assign one.</div>
+        {% endif %}
+
+        <div id="jobList" style="margin-top:12px;">
+          {% for j in jobs %}
+            <div class="job"
+              data-job="1"
+              data-job-id="{{ j.id }}"
+              data-plate="{{ j.plate_number }}"
+              data-status="{{ j.status.value }}"
+              data-lat="{{ j.location_lat }}"
+              data-lng="{{ j.location_lng }}"
+            >
+              <div class="plate">{{ j.plate_number }}</div>
+              <div class="small meta">Status: {{ j.status.value }} • Created: {{ j.created_at }}</div>
+              <div class="small meta">GPS: {{ j.location_lat }}, {{ j.location_lng }}</div>
+              <div class="small meta">Job ID: {{ j.id }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <div style="font-weight:900;">Google Maps</div>
+          <a id="openMaps" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
+        </div>
+
+        <div class="small" id="selectedText" style="margin-top:6px;">Select a job to view its coordinates.</div>
+
+        <iframe
+          id="mapFrame"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          src="about:blank">
+        </iframe>
+
+        <div class="small" id="coordText" style="margin-top:10px;">—</div>
+      </div>
+    </div>
+
+    <script>
+      const jobList = document.getElementById("jobList");
+
+      function mapsEmbedUrl(lat, lng) {
+        return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&z=18&output=embed`;
+      }
+      function mapsOpenUrl(lat, lng) {
+        return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&z=18`;
+      }
+
+      function selectJob(jobEl) {
+        document.querySelectorAll(".job.selected").forEach(j => j.classList.remove("selected"));
+        jobEl.classList.add("selected");
+
+        const jobId = jobEl.dataset.jobId;
+        const plate = jobEl.dataset.plate || "—";
+        const status = jobEl.dataset.status || "—";
+        const lat = Number(jobEl.dataset.lat);
+        const lng = Number(jobEl.dataset.lng);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          document.getElementById("selectedText").textContent = "Invalid coordinates for this job.";
+          return;
+        }
+
+        document.getElementById("mapFrame").src = mapsEmbedUrl(lat, lng);
+        document.getElementById("openMaps").href = mapsOpenUrl(lat, lng);
+        document.getElementById("selectedText").textContent = `${plate} • ${status} • Job ID: ${jobId}`;
+        document.getElementById("coordText").textContent = `lat=${lat.toFixed(6)}, lng=${lng.toFixed(6)}`;
+      }
+
+      jobList.addEventListener("click", (ev) => {
+        const jobEl = ev.target.closest && ev.target.closest("[data-job='1']");
+        if (jobEl) selectJob(jobEl);
+      });
+
+      // Auto-select first job if exists
+      (function autoSelectFirst(){
+        const first = document.querySelector("[data-job='1']");
+        if (first) selectJob(first);
+      })();
+    </script>
+  </body>
+</html>
