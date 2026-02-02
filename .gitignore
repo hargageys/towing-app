@@ -1,12 +1,8 @@
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-*.db
+*.pyc
 .env
+tow.db
+towing-app.zip
 uploads/
+venv/
 *.log
-.DS_Store
